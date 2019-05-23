@@ -1,0 +1,150 @@
+version: "3.7"
+
+services:
+  elasticsearch1:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.1.0
+    container_name: elasticsearch1
+    environment:
+      - node.name=elasticsearch1
+      - node.master=true
+      - node.data=false
+      - node.ingest=true
+      - cluster.remote.connect=false
+      - cluster.initial_master_nodes=elasticsearch1
+      # - discovery.type=single-node
+      - discovery.seed_hosts=elasticsearch2,elasticsearch3
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es_data:/usr/share/elasticsearch
+    ports:
+      - 9200:9200
+      - 9300:9300
+    networks:
+      - esnet
+
+  elasticsearch2:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.1.0
+    container_name: elasticsearch2
+    depends_on:
+      - elasticsearch1
+    environment:
+      - node.name=elasticsearch2
+      - node.master=false
+      - node.data=true
+      - node.ingest=true
+      - cluster.remote.connect=false
+      # - discovery.type=single-node
+      - cluster.name=docker-cluster
+      - discovery.seed_hosts=elasticsearch1,elasticsearch3
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es_data2:/usr/share/elasticsearch
+    networks:
+      - esnet
+
+  elasticsearch3:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.1.0
+    container_name: elasticsearch3
+    depends_on:
+      - elasticsearch1
+    environment:
+      - node.name=elasticsearch3
+      - node.master=false
+      - node.data=true
+      - node.ingest=true
+      - cluster.remote.connect=false
+      # - discovery.type=single-node
+      - cluster.name=docker-cluster
+      - discovery.seed_hosts=elasticsearch1,elasticsearch2
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es_data3:/usr/share/elasticsearch
+    networks:
+      - esnet
+
+  # headPlugin:
+  #   image: "mobz/elasticsearch-head"
+  #   container_name: head
+  #   ports:
+  #     - "9100:9100"
+  #   networks:
+  #     - esnet
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.1.0
+    depends_on:
+      - elasticsearch1
+      # - elasticsearch2
+      # - elasticsearch3
+    container_name: kibana
+    environment:
+      ELASTICSEARCH_HOSTS: "http://elasticsearch1:9200"
+    volumes:
+      - kibana_conf:/usr/share/kibana/config
+    ports:
+      - "5601:5601"
+    networks:
+      - esnet
+
+  # logstash:
+  #   image: docker.elastic.co/logstash/logstash:7.1.0
+  #   volumes:
+  #     - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+  #     - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+  #   ports:
+  #     - "5000:5000"
+  #     - "9600:9600"
+  #   environment:
+  #     LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+  #   networks:
+  #     - esnet
+  #   depends_on:
+  #     - elasticsearch1
+
+volumes:
+  es_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: $PWD/${ELASTIC_PATH}
+      o: bind
+  es_data2:
+    driver: local
+    driver_opts:
+      type: none
+      device: $PWD/${ELASTIC2_PATH}
+      o: bind
+  es_data3:
+    driver: local
+    driver_opts:
+      type: none
+      device: $PWD/${ELASTIC3_PATH}
+      o: bind
+  kibana_conf:
+    driver: local
+    driver_opts:
+      type: none
+      device: $PWD/${KIBANA_CONF}
+      o: bind
+
+networks:
+  esnet:
